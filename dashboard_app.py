@@ -64,9 +64,9 @@ col_c, col_d, col_e = st.columns(3)
 
 with col_c:
     st.subheader("Top vendedores")
-    df = query("""SELECT ve.nombre_vendedor, SUM(v.valor_venta) as total 
-                  FROM ventas v JOIN vendedores ve ON v.id_vendedor = ve.id_vendedor 
-                  GROUP BY ve.id_vendedor ORDER BY total DESC LIMIT 10""")
+    df = query("""SELECT CONCAT(ve.nombres, ' ', ve.apellidos) as nombre_vendedor, SUM(v.valor_venta) as total 
+              FROM ventas v JOIN vendedores ve ON v.id_vendedor = ve.id_vendedor 
+              GROUP BY ve.id_vendedor ORDER BY total DESC LIMIT 10""")
     st.plotly_chart(px.bar(df, x='total', y='nombre_vendedor', orientation='h', color_discrete_sequence=['#f59e0b']), use_container_width=True)
 
 with col_d:
