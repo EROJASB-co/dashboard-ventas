@@ -9,7 +9,7 @@ import plotly.express as px
 DB_HOST     = 'switchyard.proxy.rlwy.net'
 DB_PORT     = 31938
 DB_USER     = 'root'
-DB_PASSWORD = 'TU_PASSWORD_RAILWAY'
+DB_PASSWORD = 'NwxVlDNryxmxWvIAekIPWqTnHxsUFuQp'
 DB_NAME     = 'sistemaventas'
 # ============================================
 
