@@ -2,15 +2,11 @@ import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine, text
 
-# ============================================
-# CAMBIA ESTOS VALORES POR LOS DE RAILWAY
-# ============================================
 DB_HOST     = 'switchyard.proxy.rlwy.net'
 DB_PORT     = 31938
 DB_USER     = 'root'
 DB_PASSWORD = 'NwxVlDNryxmxWvIAekIPWqTnHxsUFuQp'
 DB_NAME     = 'sistemaventas'
-# ============================================
 
 st.set_page_config(page_title="Cuadro de Mando - Sistema Ventas", layout="wide", page_icon="🚗")
 
