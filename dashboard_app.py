@@ -98,15 +98,52 @@ else:
 
 
 # ══════════════════════════════════════════════════════
-# SECCIÓN NUEVA: FUENTE EXTERNA - MERCADO COLOMBIA
-# Fuente: ANDEMOS / RUNT 2024
+# SECCIÓN NUEVA: FUENTE EXTERNA - GDP Y ECONOMÍA
+# Fuente: World Bank GDP Dataset (via GitHub/datasets)
+# URL: https://github.com/datasets/gdp
 # ══════════════════════════════════════════════════════
 st.divider()
-st.title("🌍 Análisis vs Mercado Colombia — Fuente Externa ANDEMOS 2025")
-st.caption("Datos del mercado nacional de vehículos obtenidos de ANDEMOS / RUNT Colombia 2025 · Total: 254.205 unidades (+26.5%)")
+st.title("🌍 Análisis Económico — Fuente Externa Banco Mundial")
+st.caption("Datos cargados en tiempo real desde: github.com/datasets/gdp · Fuente original: Banco Mundial")
 
-# Tabla externa: ventas por marca en Colombia 2025
-# Fuente: ANDEMOS / RUNT - Total 254.205 unidades matriculadas en 2025 (crecimiento 26.5%)
+@st.cache_data(ttl=3600)
+def cargar_datos_externos():
+    import requests
+    from io import StringIO
+
+    # GDP por país — Banco Mundial vía GitHub datasets (dominio público)
+    url_gdp = "https://raw.githubusercontent.com/datasets/gdp/master/data/gdp.csv"
+    url_pop = "https://raw.githubusercontent.com/datasets/population/master/data/population.csv"
+
+    df_gdp = pd.read_csv(StringIO(requests.get(url_gdp, timeout=15).text))
+    df_pop = pd.read_csv(StringIO(requests.get(url_pop, timeout=15).text))
+
+    # Filtrar Colombia y países de referencia
+    paises = ['Colombia','Mexico','Chile','Peru','Ecuador','Argentina','Brazil']
+    df_gdp_latam = df_gdp[df_gdp['Country Name'].isin(paises)].rename(
+        columns={'Country Name':'pais','Year':'anio','Value':'gdp_usd'})
+    df_gdp_latam = df_gdp_latam[df_gdp_latam['anio'] >= 2015].dropna()
+
+    df_pop_latam = df_pop[df_pop['Country Name'].isin(paises)].rename(
+        columns={'Country Name':'pais','Year':'anio','Value':'poblacion'})
+    df_pop_latam = df_pop_latam[df_pop_latam['anio'] >= 2015].dropna()
+
+    # Unir GDP + población → calcular GDP per cápita
+    df = df_gdp_latam.merge(df_pop_latam[['pais','anio','poblacion']], on=['pais','anio'], how='left')
+    df['gdp_per_capita'] = df['gdp_usd'] / df['poblacion']
+    df['gdp_billones'] = df['gdp_usd'] / 1e9
+
+    return df
+
+with st.spinner("Cargando datos del Banco Mundial..."):
+    try:
+        df_eco = cargar_datos_externos()
+        ext_ok = True
+    except Exception as e:
+        st.error(f"Error cargando fuente externa: {e}")
+        ext_ok = False
+
+# Datos ANDEMOS 2025 como referencia del mercado automotor colombiano
 marcas_colombia = pd.DataFrame({
     'marca': ['Kia','Renault','Chevrolet','Suzuki','Mazda',
               'Toyota','Hyundai','BYD','Volkswagen','Nissan',
@@ -126,7 +163,6 @@ marcas_colombia = pd.DataFrame({
     'precio_promedio_millones': [72,58,65,48,78,95,70,88,105,85,92,45,48,72,65]
 })
 
-# Tabla externa: ventas mensuales nacionales Colombia 2024
 meses_colombia = pd.DataFrame({
     'mes': list(range(1,13)),
     'mes_nombre': ['Ene','Feb','Mar','Abr','May','Jun',
@@ -197,5 +233,36 @@ with col_r4:
     st.plotly_chart(fig, use_container_width=True)
 
 
+# ── REPORTE EXTERNO 4: GDP Colombia vs Latinoamérica (Banco Mundial) ──
+if ext_ok:
+    st.subheader("📈 Reporte E4 — GDP Colombia vs Latinoamérica (Banco Mundial en vivo)")
+    st.caption("Fuente: github.com/datasets/gdp · Banco Mundial · Cargado dinámicamente con requests + pandas")
+
+    col_g1, col_g2 = st.columns(2)
+    with col_g1:
+        df_col = df_eco[df_eco['pais']=='Colombia'].sort_values('anio')
+        fig = px.line(df_col, x='anio', y='gdp_billones', markers=True,
+                      color_discrete_sequence=['#3b82f6'],
+                      title='PIB Colombia (USD miles de millones)',
+                      labels={'gdp_billones':'PIB (miles de millones USD)','anio':'Año'})
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_g2:
+        df_last = df_eco.sort_values('anio').groupby('pais').last().reset_index()
+        fig = px.bar(df_last.sort_values('gdp_billones', ascending=True),
+                     x='gdp_billones', y='pais', orientation='h',
+                     color_discrete_sequence=['#10b981'],
+                     title='PIB Latinoamérica — año más reciente',
+                     labels={'gdp_billones':'PIB (miles de millones USD)','pais':'País'})
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("💵 GDP per cápita Colombia vs región")
+    df_pc = df_eco[df_eco['gdp_per_capita'].notna()]
+    fig = px.line(df_pc, x='anio', y='gdp_per_capita', color='pais',
+                  markers=True,
+                  title='GDP per cápita comparativo (USD)',
+                  labels={'gdp_per_capita':'GDP per cápita (USD)','anio':'Año','pais':'País'})
+    st.plotly_chart(fig, use_container_width=True)
+
 st.divider()
-st.caption("Actividad 5 · Modelamiento Multidimensional OLAP · Fuentes: Railway + ANDEMOS/RUNT Colombia 2025")
+st.caption("Actividad 5 · Modelamiento Multidimensional OLAP · Fuentes: Railway + ANDEMOS 2025 + Banco Mundial (GitHub datasets)")
