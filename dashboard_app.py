@@ -174,8 +174,8 @@ st.plotly_chart(fig, use_container_width=True)
 st.subheader("🚀 Reporte E3 — Marcas con mayor crecimiento en Colombia 2025")
 col_r3, col_r4 = st.columns(2)
 with col_r3:
-    df_crec = marcas_colombia.sort_values('variacion_vs_2023_pct', ascending=False)
-    colors = ['#10b981' if v > 0 else '#ef4444' for v in df_crec['variacion_vs_2023_pct']]
+    df_crec = marcas_colombia.sort_values('variacion_vs_2024_pct', ascending=False)
+    colors = ['#10b981' if v > 0 else '#ef4444' for v in df_crec['variacion_vs_2024_pct']]
     fig = go.Figure(go.Bar(
         x=df_crec['marca'], y=df_crec['variacion_vs_2024_pct'],
         marker_color=colors,
