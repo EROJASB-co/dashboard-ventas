@@ -40,6 +40,7 @@ col5.metric("💰 Ingresos",   f"${int(ingresos)/1_000_000:.1f}M")
 st.divider()
 
 import plotly.express as px
+import plotly.graph_objects as go
 
 col_a, col_b = st.columns(2)
 with col_a:
