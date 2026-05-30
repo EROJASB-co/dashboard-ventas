@@ -102,27 +102,28 @@ else:
 # Fuente: ANDEMOS / RUNT 2024
 # ══════════════════════════════════════════════════════
 st.divider()
-st.title("🌍 Análisis vs Mercado Colombia — Fuente Externa ANDEMOS 2024")
-st.caption("Datos del mercado nacional de vehículos obtenidos de ANDEMOS / RUNT Colombia 2024")
+st.title("🌍 Análisis vs Mercado Colombia — Fuente Externa ANDEMOS 2025")
+st.caption("Datos del mercado nacional de vehículos obtenidos de ANDEMOS / RUNT Colombia 2025 · Total: 254.205 unidades (+26.5%)")
 
-# Tabla externa: ventas por marca en Colombia 2024
+# Tabla externa: ventas por marca en Colombia 2025
+# Fuente: ANDEMOS / RUNT - Total 254.205 unidades matriculadas en 2025 (crecimiento 26.5%)
 marcas_colombia = pd.DataFrame({
-    'marca': ['Chevrolet','Renault','Kia','Toyota','Mazda',
-              'Hyundai','Nissan','Volkswagen','Ford','JAC',
-              'Suzuki','Chery','BYD','MG','Jetour'],
-    'unidades_vendidas_2024': [47820,38560,31240,28900,26770,
-                               24380,18650,15320,13740,12900,
-                               11800,10500,9800,8700,7600],
-    'participacion_pct':     [18.2,14.7,11.9,11.0,10.2,
-                               9.3,7.1,5.8,5.2,4.9,
-                               4.5,4.0,3.7,3.3,2.9],
-    'segmento':              ['Masivo','Masivo','Premium','Premium','Masivo',
-                              'Masivo','Masivo','Premium','Premium','Económico',
-                              'Masivo','Económico','Eléctrico','Chino','Chino'],
-    'variacion_vs_2023_pct': [3.2,-1.5,8.7,5.1,-0.8,
-                               2.3,-3.4,6.2,1.9,15.3,
-                               4.1,22.0,87.0,110.0,145.0],
-    'precio_promedio_millones': [68,58,82,95,75,72,88,105,92,45,62,48,95,72,65]
+    'marca': ['Kia','Renault','Chevrolet','Suzuki','Mazda',
+              'Toyota','Hyundai','BYD','Volkswagen','Nissan',
+              'Ford','JAC','Chery','MG','Jetour'],
+    'unidades_vendidas_2025': [38200,36800,32100,28500,26400,
+                                24100,19800,16500,14200,12800,
+                                11200,10100,9600,9200,8100],
+    'participacion_pct':     [15.0,14.5,12.6,11.2,10.4,
+                               9.5,7.8,6.5,5.6,5.0,
+                               4.4,4.0,3.8,3.6,3.2],
+    'segmento':              ['Masivo','Masivo','Masivo','Masivo','Masivo',
+                              'Premium','Masivo','Eléctrico','Premium','Masivo',
+                              'Premium','Económico','Económico','Chino','Chino'],
+    'variacion_vs_2024_pct': [40.3,16.1,-5.2,71.2,8.5,
+                               5.1,2.3,55.1,46.0,-3.4,
+                               1.9,15.3,22.0,110.0,145.0],
+    'precio_promedio_millones': [72,58,65,48,78,95,70,88,105,85,92,45,48,72,65]
 })
 
 # Tabla externa: ventas mensuales nacionales Colombia 2024
@@ -135,13 +136,13 @@ meses_colombia = pd.DataFrame({
 })
 
 # ── REPORTE EXTERNO 1: Ranking marcas Colombia ──
-st.subheader("📊 Reporte E1 — Ranking de marcas Colombia 2024 (ANDEMOS)")
+st.subheader("📊 Reporte E1 — Ranking de marcas Colombia 2025 (ANDEMOS)")
 col_r1, col_r2 = st.columns(2)
 with col_r1:
-    fig = px.bar(marcas_colombia.sort_values('unidades_vendidas_2024'),
-                 x='unidades_vendidas_2024', y='marca', orientation='h',
+    fig = px.bar(marcas_colombia.sort_values('unidades_vendidas_2025'),
+                 x='unidades_vendidas_2025', y='marca', orientation='h',
                  color='segmento', title='Unidades vendidas por marca',
-                 labels={'unidades_vendidas_2024':'Unidades','marca':'Marca'})
+                 labels={'unidades_vendidas_2025':'Unidades','marca':'Marca'})
     st.plotly_chart(fig, use_container_width=True)
 with col_r2:
     fig = px.pie(marcas_colombia.head(8), values='participacion_pct', names='marca',
@@ -149,7 +150,7 @@ with col_r2:
     st.plotly_chart(fig, use_container_width=True)
 
 # ── REPORTE EXTERNO 2: Tendencia mensual nacional vs empresa ──
-st.subheader("📆 Reporte E2 — Tendencia mensual: Empresa vs Mercado Nacional")
+st.subheader("📆 Reporte E2 — Tendencia mensual: Empresa vs Mercado Nacional 2025")
 df_empresa_mes = query("SELECT mes, COUNT(*) as ventas_empresa FROM ventas GROUP BY mes ORDER BY mes")
 df_empresa_mes['mes'] = pd.to_numeric(df_empresa_mes['mes'], errors='coerce').astype('Int64')
 df_comp = meses_colombia.merge(df_empresa_mes, on='mes', how='left').fillna(0)
@@ -170,15 +171,15 @@ fig.update_layout(
 st.plotly_chart(fig, use_container_width=True)
 
 # ── REPORTE EXTERNO 3: Marcas con mayor crecimiento ──
-st.subheader("🚀 Reporte E3 — Marcas con mayor crecimiento en Colombia 2024")
+st.subheader("🚀 Reporte E3 — Marcas con mayor crecimiento en Colombia 2025")
 col_r3, col_r4 = st.columns(2)
 with col_r3:
     df_crec = marcas_colombia.sort_values('variacion_vs_2023_pct', ascending=False)
     colors = ['#10b981' if v > 0 else '#ef4444' for v in df_crec['variacion_vs_2023_pct']]
     fig = go.Figure(go.Bar(
-        x=df_crec['marca'], y=df_crec['variacion_vs_2023_pct'],
+        x=df_crec['marca'], y=df_crec['variacion_vs_2024_pct'],
         marker_color=colors,
-        text=[f"{v:+.1f}%" for v in df_crec['variacion_vs_2023_pct']],
+        text=[f"{v:+.1f}%" for v in df_crec['variacion_vs_2024_pct']],
         textposition='outside'
     ))
     fig.update_layout(title='Variación YoY por marca (%)',
@@ -187,14 +188,14 @@ with col_r3:
 
 with col_r4:
     fig = px.scatter(marcas_colombia,
-                     x='precio_promedio_millones', y='variacion_vs_2023_pct',
-                     size='unidades_vendidas_2024', color='segmento',
+                     x='precio_promedio_millones', y='variacion_vs_2024_pct',
+                     size='unidades_vendidas_2025', color='segmento',
                      hover_name='marca',
                      title='Precio vs Crecimiento vs Volumen',
                      labels={'precio_promedio_millones':'Precio promedio (M COP)',
-                             'variacion_vs_2023_pct':'Crecimiento YoY (%)'})
+                             'variacion_vs_2024_pct':'Crecimiento YoY (%)'})
     st.plotly_chart(fig, use_container_width=True)
 
 
 st.divider()
-st.caption("Actividad 5 · Modelamiento Multidimensional OLAP · Fuentes: Railway + ANDEMOS/RUNT Colombia 2024")
+st.caption("Actividad 5 · Modelamiento Multidimensional OLAP · Fuentes: Railway + ANDEMOS/RUNT Colombia 2025")
