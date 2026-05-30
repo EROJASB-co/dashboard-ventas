@@ -230,34 +230,41 @@ def build_cubo_olap():
 
     # Dim Vehiculo
     dim_vehiculo = query("""
-        SELECT cod_vehiculo, marca, modelo, anio_modelo,
-               COALESCE(tipo, 'No especificado') as tipo,
-               COALESCE(color, 'No especificado') as color
+        SELECT cod_vehiculo,
+               COALESCE(marca, 'Sin marca') as marca,
+               COALESCE(tipo_vehiculo, 'No especificado') as tipo_vehiculo,
+               COALESCE(combustible, 'No especificado') as combustible,
+               COALESCE(ubicacion, 'No especificado') as ubicacion,
+               meses_de_uso, blindaje
         FROM vehiculos
     """)
 
     # Dim Cliente
     dim_cliente = query("""
-        SELECT cod_cliente, ciudad,
+        SELECT cod_cliente,
+               COALESCE(ciudad, 'No especificado') as ciudad,
                COALESCE(genero, 'No especificado') as genero,
-               COALESCE(tipo_cliente, 'Natural') as tipo_cliente
+               COALESCE(estado_civil, 'No especificado') as estado_civil,
+               COALESCE(nivel_educativo, 'No especificado') as nivel_educativo,
+               estrato
         FROM clientes
     """)
 
     # Dim Vendedor
     dim_vendedor = query("""
         SELECT id_vendedor,
-               CONCAT(nombres, ' ', apellidos) as nombre_vendedor,
-               COALESCE(ciudad, 'No especificado') as ciudad_vendedor
+               CONCAT(COALESCE(nombres,''), ' ', COALESCE(apellidos,'')) as nombre_vendedor,
+               COALESCE(genero, 'No especificado') as genero_vendedor,
+               COALESCE(nivel_estudios, 'No especificado') as nivel_estudios
         FROM vendedores
     """)
 
     # Enriquecer fact con dimensiones
     fact = fact.merge(dim_tiempo[['anio','mes','trimestre','semestre','nombre_mes','id_tiempo']],
                       on=['anio','mes'], how='left')
-    fact = fact.merge(dim_vehiculo[['cod_vehiculo','marca','modelo','tipo']],
+    fact = fact.merge(dim_vehiculo[['cod_vehiculo','marca','tipo_vehiculo','combustible']],
                       left_on='cod_vehiculos', right_on='cod_vehiculo', how='left')
-    fact = fact.merge(dim_cliente[['cod_cliente','ciudad','genero','tipo_cliente']],
+    fact = fact.merge(dim_cliente[['cod_cliente','ciudad','genero','estado_civil','estrato']],
                       on='cod_cliente', how='left')
     fact = fact.merge(dim_vendedor[['id_vendedor','nombre_vendedor']],
                       on='id_vendedor', how='left')
@@ -547,9 +554,9 @@ with tab3:
     with c2:
         # Reporte cruzado 3: Tipo de cliente vs medio de pago
         st.markdown('<p class="section-header">💳 Reporte C3 — Tipo cliente × Medio de pago</p>', unsafe_allow_html=True)
-        df_hm = fact_ventas.groupby(['tipo_cliente','medio_pago'])['valor_venta'].sum().reset_index()
-        if not df_hm.empty and df_hm['tipo_cliente'].notna().any():
-            df_pivot = df_hm.pivot(index='tipo_cliente', columns='medio_pago', values='valor_venta').fillna(0)
+        df_hm = fact_ventas.groupby(['estado_civil','medio_pago'])['valor_venta'].sum().reset_index()
+        if not df_hm.empty and df_hm['estado_civil'].notna().any():
+            df_pivot = df_hm.pivot(index='estado_civil', columns='medio_pago', values='valor_venta').fillna(0)
             fig = px.imshow(df_pivot, color_continuous_scale='Oranges', aspect='auto',
                             labels={'color':'Ingresos'})
             fig.update_layout(**PLOT_THEME)
@@ -595,7 +602,7 @@ nombre_mes           anio_modelo<br><br>
 <span class="dim-table">DIM_VENDEDOR</span>         <span class="ext-table">DIM_MERCADO_CO 🌍</span><br>
 <span class="key-col">id_vendedor</span> PK        <span class="key-col">marca</span> PK<br>
 nombre_vendedor      unidades_2024<br>
-ciudad_vendedor      participacion_pct<br>
+genero_vendedor      participacion_pct<br>
                      segmento<br>
                      variacion_yoy<br>
                      precio_promedio<br>
@@ -611,7 +618,7 @@ ciudad_vendedor      participacion_pct<br>
         st.markdown("#### Dimensiones")
         st.markdown("""
 - 🕐 **Tiempo** — año, mes, trimestre, semestre
-- 🚗 **Vehículo** — marca, modelo, tipo, color
+- 🚗 **Vehículo** — marca, tipo_vehiculo, combustible, ubicacion
 - 👤 **Cliente** — ciudad, género, tipo
 - 🧑‍💼 **Vendedor** — nombre, ciudad
 - 🌍 **Mercado CO** *(externa)* — ANDEMOS 2024
@@ -654,14 +661,14 @@ with tab5:
     if anio_sel   != 'Todos':  df_view = df_view[df_view['anio']   == anio_sel]
     if ciudad_sel != 'Todas':  df_view = df_view[df_view['ciudad'] == ciudad_sel]
 
-    cols_show = ['referencia','anio','nombre_mes','trimestre','marca','modelo',
-                 'tipo','ciudad','nombre_vendedor','medio_pago','valor_venta','valor_pagado','medio_enterado']
+    cols_show = ['referencia','anio','nombre_mes','trimestre','marca','tipo_vehiculo',
+                 'combustible','ciudad','nombre_vendedor','medio_pago','valor_venta','valor_pagado','medio_enterado']
     cols_show = [c for c in cols_show if c in df_view.columns]
 
     st.dataframe(
         df_view[cols_show].rename(columns={
             'referencia':'Referencia','anio':'Año','nombre_mes':'Mes','trimestre':'Trim.',
-            'marca':'Marca','modelo':'Modelo','tipo':'Tipo','ciudad':'Ciudad',
+            'marca':'Marca','tipo_vehiculo':'Tipo Vehículo','combustible':'Combustible','ciudad':'Ciudad',
             'nombre_vendedor':'Vendedor','medio_pago':'Medio Pago',
             'valor_venta':'Valor Venta','valor_pagado':'Valor Pagado',
             'medio_enterado':'Cómo se enteró'
