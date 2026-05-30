@@ -98,87 +98,117 @@ else:
 
 
 # ══════════════════════════════════════════════════════
-# SECCIÓN NUEVA: FUENTE EXTERNA - GDP Y ECONOMÍA
-# Fuente: World Bank GDP Dataset (via GitHub/datasets)
-# URL: https://github.com/datasets/gdp
+# SECCIÓN NUEVA: FUENTES EXTERNAS
+# 1. PIB Colombia — Banco Mundial (GitHub datasets, en vivo)
+# 2. Mercado automotor Colombia 2025 — ANDEMOS/RUNT (manual)
 # ══════════════════════════════════════════════════════
 st.divider()
-st.title("💱 Análisis TRM y Tipos de Cambio — Fuente Externa en Vivo")
-st.caption("Datos cargados en tiempo real desde: github.com/datasets/exchange-rates · Fuente: BIS (Banco de Pagos Internacionales) · Complementado con TRM histórica del Banco de la República Colombia")
+st.title("🌍 Fuentes Externas — PIB Colombia + Mercado Automotor")
 
+# ─── FUENTE 1: PIB en vivo desde GitHub/Banco Mundial ───
 @st.cache_data(ttl=3600)
-def cargar_trm_externa():
-    """
-    Carga tipos de cambio en tiempo real desde:
-    github.com/datasets/exchange-rates (fuente: BIS / Banco de Pagos Internacionales)
-    Dataset público, sin API key, actualizado diariamente.
-    Complementado con TRM Colombia histórica real (Banco de la República).
-    """
+def cargar_pib():
     import requests
     from io import StringIO
+    url_gdp = "https://raw.githubusercontent.com/datasets/gdp/master/data/gdp.csv"
+    url_pop = "https://raw.githubusercontent.com/datasets/population/master/data/population.csv"
+    df_gdp = pd.read_csv(StringIO(requests.get(url_gdp, timeout=15).text))
+    df_pop = pd.read_csv(StringIO(requests.get(url_pop, timeout=15).text))
 
-    url = "https://raw.githubusercontent.com/datasets/exchange-rates/master/data/daily.csv"
-    df = pd.read_csv(StringIO(requests.get(url, timeout=15).text))
-    df['Date'] = pd.to_datetime(df['Date'])
-    df = df[df['Date'].dt.year >= 2018]
+    paises = ['Colombia','Mexico','Chile','Peru','Brazil']
+    df = df_gdp[df_gdp['Country Name'].isin(paises)].rename(
+        columns={'Country Name':'pais','Year':'anio','Value':'gdp_usd'})
+    df = df[df['anio'] >= 2015].dropna()
+    df['gdp_billones'] = df['gdp_usd'] / 1e9
 
-    # Países de referencia disponibles en el dataset
-    paises_ref = ['Brazil', 'Mexico', 'South Korea', 'Japan', 'China']
-    df_ref = df[df['Country'].isin(paises_ref)].copy()
-    df_ref['anio'] = df_ref['Date'].dt.year
-    df_ref['mes']  = df_ref['Date'].dt.month
+    df_p = df_pop[df_pop['Country Name'] == 'Colombia'].rename(
+        columns={'Country Name':'pais','Year':'anio','Value':'poblacion'})
+    df_col = df[df['pais']=='Colombia'].merge(df_p[['anio','poblacion']], on='anio', how='left')
+    df_col['gdp_per_capita'] = df_col['gdp_usd'] / df_col['poblacion']
 
-    # Promedio mensual por país
-    df_mensual = df_ref.groupby(['Country','anio','mes'])['Exchange rate'].mean().reset_index()
+    return df, df_col
 
-    # TRM Colombia real — Banco de la República Colombia
-    # Valores promedio anual COP por 1 USD
-    trm_colombia = pd.DataFrame({
-        'anio':         [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
-        'trm_promedio': [2956, 3281, 3694, 3743, 4255, 4325, 4192, 4150],
-        'trm_max':      [3249, 3535, 4153, 4065, 5062, 4988, 4450, 4380],
-        'trm_min':      [2762, 3072, 3262, 3585, 3550, 3736, 3870, 3950],
-    })
-
-    return df_mensual, trm_colombia
-
-with st.spinner("Cargando tipos de cambio desde GitHub Datasets..."):
+with st.spinner("Cargando PIB desde Banco Mundial (GitHub datasets)..."):
     try:
-        df_cambio, trm_colombia = cargar_trm_externa()
-        ext_ok = True
+        df_pib, df_col_pib = cargar_pib()
+        pib_ok = True
     except Exception as e:
-        st.error(f"Error cargando fuente externa: {e}")
-        ext_ok = False
+        st.error(f"Error cargando PIB: {e}")
+        pib_ok = False
 
-# Datos ANDEMOS 2025 como referencia del mercado automotor colombiano
+st.subheader("📊 Fuente 1 — PIB Banco Mundial (cargado en vivo con requests + pandas)")
+st.caption("github.com/datasets/gdp · Fuente original: Banco Mundial · Relevancia: el crecimiento económico impulsa la compra de vehículos")
+
+if pib_ok:
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        # Gráfico 1: PIB Colombia evolución
+        df_co = df_pib[df_pib['pais']=='Colombia'].sort_values('anio')
+        fig = px.line(df_co, x='anio', y='gdp_billones', markers=True,
+                      color_discrete_sequence=['#3b82f6'],
+                      title='📈 PIB Colombia 2015-2023',
+                      labels={'gdp_billones':'PIB (miles de millones USD)','anio':'Año'})
+        fig.update_traces(line_width=3, marker_size=7)
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("Muestra el crecimiento económico de Colombia. La caída del 2020 fue por el COVID. La recuperación 2021-2023 refleja mayor poder de compra y explica el aumento en ventas de vehículos.")
+
+    with col2:
+        # Gráfico 2: Comparativo PIB Latinoamérica
+        df_last = df_pib.sort_values('anio').groupby('pais').last().reset_index()
+        fig = px.bar(df_last.sort_values('gdp_billones'),
+                     x='gdp_billones', y='pais', orientation='h',
+                     color='gdp_billones', color_continuous_scale='Blues',
+                     title='🌎 PIB Latinoamérica comparativo',
+                     labels={'gdp_billones':'PIB (miles de millones USD)','pais':'País'})
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("Colombia es la tercera economía de la región. Esto explica por qué es un mercado atractivo para marcas como Kia, Renault y Chevrolet.")
+
+    with col3:
+        # Gráfico 3: PIB per cápita Colombia — poder adquisitivo
+        df_pc = df_col_pib[df_col_pib['gdp_per_capita'].notna()].sort_values('anio')
+        fig = px.area(df_pc, x='anio', y='gdp_per_capita',
+                      color_discrete_sequence=['#10b981'],
+                      title='💵 PIB per cápita Colombia',
+                      labels={'gdp_per_capita':'USD por persona','anio':'Año'})
+        fig.update_traces(line_width=2)
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("A mayor PIB per cápita, mayor capacidad de compra de vehículos. El crecimiento sostenido desde 2021 se correlaciona con el aumento de ventas en el sistema.")
+
+st.divider()
+
+# ─── FUENTE 2: ANDEMOS 2025 cargada manualmente ───
+st.subheader("🚗 Fuente 2 — Mercado Automotor Colombia 2025 (ANDEMOS/RUNT)")
+st.caption("Fuente: ANDEMOS — Asociación Nacional de Movilidad Sostenible · elcarrocolombiano.com · andemos.org · Total mercado 2025: 254.205 unidades (+26.5%)")
+
 marcas_colombia = pd.DataFrame({
-    'marca': ['Kia','Renault','Chevrolet','Suzuki','Mazda',
-              'Toyota','Hyundai','BYD','Volkswagen','Nissan',
-              'Ford','JAC','Chery','MG','Jetour'],
-    'unidades_vendidas_2025': [38200,36800,32100,28500,26400,
-                                24100,19800,16500,14200,12800,
-                                11200,10100,9600,9200,8100],
+    'marca':                 ['Kia','Renault','Chevrolet','Suzuki','Mazda',
+                              'Toyota','Hyundai','BYD','Volkswagen','Nissan',
+                              'Ford','JAC','Chery','MG','Jetour'],
+    'unidades_vendidas_2025':[38200,36800,32100,28500,26400,
+                              24100,19800,16500,14200,12800,
+                              11200,10100,9600,9200,8100],
     'participacion_pct':     [15.0,14.5,12.6,11.2,10.4,
-                               9.5,7.8,6.5,5.6,5.0,
-                               4.4,4.0,3.8,3.6,3.2],
+                               9.5, 7.8, 6.5, 5.6, 5.0,
+                               4.4, 4.0, 3.8, 3.6, 3.2],
     'segmento':              ['Masivo','Masivo','Masivo','Masivo','Masivo',
                               'Premium','Masivo','Eléctrico','Premium','Masivo',
                               'Premium','Económico','Económico','Chino','Chino'],
     'variacion_vs_2024_pct': [40.3,16.1,-5.2,71.2,8.5,
-                               5.1,2.3,55.1,46.0,-3.4,
+                               5.1, 2.3,55.1,46.0,-3.4,
                                1.9,15.3,22.0,110.0,145.0],
-    'precio_promedio_millones': [72,58,65,48,78,95,70,88,105,85,92,45,48,72,65]
+    'precio_promedio_millones':[72,58,65,48,78,95,70,88,105,85,92,45,48,72,65]
 })
 
 meses_colombia = pd.DataFrame({
-    'mes': list(range(1,13)),
-    'mes_nombre': ['Ene','Feb','Mar','Abr','May','Jun',
-                   'Jul','Ago','Sep','Oct','Nov','Dic'],
-    'unidades_nacional': [19800,17500,22300,20100,21800,23400,
-                          24100,22700,21500,23800,25200,24600]
+    'mes':      list(range(1,13)),
+    'mes_nombre':['Ene','Feb','Mar','Abr','May','Jun',
+                  'Jul','Ago','Sep','Oct','Nov','Dic'],
+    'unidades_nacional':[19800,17500,22300,20100,21800,23400,
+                         24100,22700,21500,23800,25200,24600]
 })
 
-# ── REPORTE EXTERNO 1: Ranking marcas Colombia ──
+# ── REPORTE E1: Ranking marcas ──
 st.subheader("📊 Reporte E1 — Ranking de marcas Colombia 2025 (ANDEMOS)")
 col_r1, col_r2 = st.columns(2)
 with col_r1:
@@ -192,13 +222,12 @@ with col_r2:
                  hole=0.4, title='Participación de mercado Top 8 (%)')
     st.plotly_chart(fig, use_container_width=True)
 
-# ── REPORTE EXTERNO 2: Tendencia mensual nacional vs empresa ──
+# ── REPORTE E2: Tendencia mensual ──
 st.subheader("📆 Reporte E2 — Tendencia mensual: Empresa vs Mercado Nacional 2025")
 df_empresa_mes = query("SELECT mes, COUNT(*) as ventas_empresa FROM ventas GROUP BY mes ORDER BY mes")
 df_empresa_mes['mes'] = pd.to_numeric(df_empresa_mes['mes'], errors='coerce').astype('Int64')
 df_comp = meses_colombia.merge(df_empresa_mes, on='mes', how='left').fillna(0)
 
-import plotly.graph_objects as go
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=df_comp['mes_nombre'], y=df_comp['unidades_nacional'],
                          name='Mercado Colombia', line=dict(color='#3b82f6', width=2),
@@ -213,7 +242,7 @@ fig.update_layout(
 )
 st.plotly_chart(fig, use_container_width=True)
 
-# ── REPORTE EXTERNO 3: Marcas con mayor crecimiento ──
+# ── REPORTE E3: Crecimiento marcas ──
 st.subheader("🚀 Reporte E3 — Marcas con mayor crecimiento en Colombia 2025")
 col_r3, col_r4 = st.columns(2)
 with col_r3:
@@ -239,54 +268,5 @@ with col_r4:
                              'variacion_vs_2024_pct':'Crecimiento YoY (%)'})
     st.plotly_chart(fig, use_container_width=True)
 
-
-# ── REPORTE EXTERNO 4: TRM Colombia histórica ──
-if ext_ok:
-    st.subheader("💵 Reporte E4 — TRM Colombia histórica (Banco de la República)")
-    st.caption("Tasa Representativa del Mercado: pesos colombianos por 1 dólar USD")
-
-    col_g1, col_g2 = st.columns(2)
-    with col_g1:
-        fig = px.line(trm_colombia, x='anio', y='trm_promedio', markers=True,
-                      color_discrete_sequence=['#f59e0b'],
-                      title='TRM Promedio Anual Colombia (COP/USD)',
-                      labels={'trm_promedio':'TRM Promedio (COP)','anio':'Año'})
-        fig.add_scatter(x=trm_colombia['anio'], y=trm_colombia['trm_max'],
-                        mode='lines', name='TRM Máxima', line=dict(dash='dash', color='#ef4444'))
-        fig.add_scatter(x=trm_colombia['anio'], y=trm_colombia['trm_min'],
-                        mode='lines', name='TRM Mínima', line=dict(dash='dash', color='#10b981'))
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col_g2:
-        trm_colombia['variacion_pct'] = trm_colombia['trm_promedio'].pct_change() * 100
-        colors_trm = ['#ef4444' if v > 0 else '#10b981' for v in trm_colombia['variacion_pct'].fillna(0)]
-        fig = go.Figure(go.Bar(
-            x=trm_colombia['anio'], y=trm_colombia['variacion_pct'],
-            marker_color=colors_trm,
-            text=[f"{v:+.1f}%" if pd.notna(v) else "" for v in trm_colombia['variacion_pct']],
-            textposition='outside'
-        ))
-        fig.update_layout(title='Variación anual TRM (%)',
-                          xaxis_title='Año', yaxis_title='Variación (%)')
-        st.plotly_chart(fig, use_container_width=True)
-
-    # ── REPORTE EXTERNO 5: Tipos de cambio en vivo países referencia ──
-    st.subheader("🌍 Reporte E5 — Tipos de cambio en vivo (BIS vía GitHub Datasets)")
-    st.caption("Fuente en vivo: raw.githubusercontent.com/datasets/exchange-rates · Cargado con requests + pandas")
-
-    pais_sel = st.selectbox("Seleccionar país de referencia",
-                             df_cambio['Country'].unique().tolist(), index=0)
-    df_pais = df_cambio[df_cambio['Country']==pais_sel].sort_values(['anio','mes'])
-    df_pais['periodo'] = df_pais['anio'].astype(str) + '-' + df_pais['mes'].astype(str).str.zfill(2)
-
-    fig = px.line(df_pais, x='periodo', y='Exchange rate', markers=False,
-                  color_discrete_sequence=['#8b5cf6'],
-                  title=f'Tipo de cambio USD/{pais_sel} — mensual 2018-2026',
-                  labels={'Exchange rate':'Tasa de cambio','periodo':'Período'})
-    fig.update_xaxes(tickangle=45, nticks=20)
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.info("💡 **Relevancia para ventas de vehículos:** cuando el dólar sube, los carros importados se encarecen en Colombia. La TRM es clave para entender fluctuaciones en los `valor_venta` del sistema.")
-
 st.divider()
-st.caption("Actividad 5 · Modelamiento Multidimensional OLAP · Fuentes: Railway + ANDEMOS 2025 + BIS Exchange Rates (GitHub Datasets) + Banco de la República Colombia")
+st.caption("Actividad 5 · Modelamiento Multidimensional OLAP · Fuentes: Railway + Banco Mundial (github.com/datasets/gdp) + ANDEMOS/RUNT Colombia 2025")
