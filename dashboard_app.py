@@ -200,11 +200,14 @@ def build_cubo_olap():
     # Tabla de hechos base
     fact = query("""
         SELECT
-            v.id_venta,
+            v.referencia,
             v.anio,
             v.mes,
             v.valor_venta,
+            v.valor_pagado,
             v.medio_pago,
+            v.medio_enterado,
+            v.avaluado,
             v.cod_cliente,
             v.id_vendedor,
             v.cod_vehiculos
@@ -308,6 +311,7 @@ with st.spinner("Construyendo cubo OLAP..."):
 # ─────────────────────────────────────────────
 total_ventas   = len(fact_ventas)
 total_ingresos = fact_ventas['valor_venta'].sum()
+total_pagado   = fact_ventas['valor_pagado'].sum()
 ticket_prom    = fact_ventas['valor_venta'].mean() if total_ventas else 0
 marcas_unicas  = fact_ventas['marca'].nunique()
 ciudades       = fact_ventas['ciudad'].nunique()
@@ -316,8 +320,8 @@ vendedores_n   = fact_ventas['nombre_vendedor'].nunique()
 k1, k2, k3, k4, k5, k6 = st.columns(6)
 kpis = [
     ("📋 Ventas", f"{total_ventas:,}"),
-    ("💰 Ingresos", f"${total_ingresos/1_000_000:.1f}M"),
-    ("🎯 Ticket Prom.", f"${ticket_prom/1_000_000:.2f}M"),
+    ("💰 Valor Venta", f"${total_ingresos/1_000_000:.1f}M"),
+    ("✅ Valor Pagado", f"${total_pagado/1_000_000:.1f}M"),
     ("🏎️ Marcas", str(marcas_unicas)),
     ("🏙️ Ciudades", str(ciudades)),
     ("🧑 Vendedores", str(vendedores_n)),
@@ -646,16 +650,18 @@ with tab5:
     if anio_sel   != 'Todos':  df_view = df_view[df_view['anio']   == anio_sel]
     if ciudad_sel != 'Todas':  df_view = df_view[df_view['ciudad'] == ciudad_sel]
 
-    cols_show = ['id_venta','anio','nombre_mes','trimestre','marca','modelo',
-                 'tipo','ciudad','nombre_vendedor','medio_pago','valor_venta']
+    cols_show = ['referencia','anio','nombre_mes','trimestre','marca','modelo',
+                 'tipo','ciudad','nombre_vendedor','medio_pago','valor_venta','valor_pagado','medio_enterado']
     cols_show = [c for c in cols_show if c in df_view.columns]
 
     st.dataframe(
         df_view[cols_show].rename(columns={
-            'id_venta':'ID Venta','anio':'Año','nombre_mes':'Mes','trimestre':'Trim.',
+            'referencia':'Referencia','anio':'Año','nombre_mes':'Mes','trimestre':'Trim.',
             'marca':'Marca','modelo':'Modelo','tipo':'Tipo','ciudad':'Ciudad',
-            'nombre_vendedor':'Vendedor','medio_pago':'Medio Pago','valor_venta':'Valor Venta'
-        }).style.format({'Valor Venta':'${:,.0f}'}),
+            'nombre_vendedor':'Vendedor','medio_pago':'Medio Pago',
+            'valor_venta':'Valor Venta','valor_pagado':'Valor Pagado',
+            'medio_enterado':'Cómo se enteró'
+        }).style.format({'Valor Venta':'${:,.0f}','Valor Pagado':'${:,.0f}'}),
         use_container_width=True,
         height=450,
         hide_index=True
