@@ -103,41 +103,48 @@ else:
 # URL: https://github.com/datasets/gdp
 # ══════════════════════════════════════════════════════
 st.divider()
-st.title("🌍 Análisis Económico — Fuente Externa Banco Mundial")
-st.caption("Datos cargados en tiempo real desde: github.com/datasets/gdp · Fuente original: Banco Mundial")
+st.title("💱 Análisis TRM y Tipos de Cambio — Fuente Externa en Vivo")
+st.caption("Datos cargados en tiempo real desde: github.com/datasets/exchange-rates · Fuente: BIS (Banco de Pagos Internacionales) · Complementado con TRM histórica del Banco de la República Colombia")
 
 @st.cache_data(ttl=3600)
-def cargar_datos_externos():
+def cargar_trm_externa():
+    """
+    Carga tipos de cambio en tiempo real desde:
+    github.com/datasets/exchange-rates (fuente: BIS / Banco de Pagos Internacionales)
+    Dataset público, sin API key, actualizado diariamente.
+    Complementado con TRM Colombia histórica real (Banco de la República).
+    """
     import requests
     from io import StringIO
 
-    # GDP por país — Banco Mundial vía GitHub datasets (dominio público)
-    url_gdp = "https://raw.githubusercontent.com/datasets/gdp/master/data/gdp.csv"
-    url_pop = "https://raw.githubusercontent.com/datasets/population/master/data/population.csv"
+    url = "https://raw.githubusercontent.com/datasets/exchange-rates/master/data/daily.csv"
+    df = pd.read_csv(StringIO(requests.get(url, timeout=15).text))
+    df['Date'] = pd.to_datetime(df['Date'])
+    df = df[df['Date'].dt.year >= 2018]
 
-    df_gdp = pd.read_csv(StringIO(requests.get(url_gdp, timeout=15).text))
-    df_pop = pd.read_csv(StringIO(requests.get(url_pop, timeout=15).text))
+    # Países de referencia disponibles en el dataset
+    paises_ref = ['Brazil', 'Mexico', 'South Korea', 'Japan', 'China']
+    df_ref = df[df['Country'].isin(paises_ref)].copy()
+    df_ref['anio'] = df_ref['Date'].dt.year
+    df_ref['mes']  = df_ref['Date'].dt.month
 
-    # Filtrar Colombia y países de referencia
-    paises = ['Colombia','Mexico','Chile','Peru','Ecuador','Argentina','Brazil']
-    df_gdp_latam = df_gdp[df_gdp['Country Name'].isin(paises)].rename(
-        columns={'Country Name':'pais','Year':'anio','Value':'gdp_usd'})
-    df_gdp_latam = df_gdp_latam[df_gdp_latam['anio'] >= 2015].dropna()
+    # Promedio mensual por país
+    df_mensual = df_ref.groupby(['Country','anio','mes'])['Exchange rate'].mean().reset_index()
 
-    df_pop_latam = df_pop[df_pop['Country Name'].isin(paises)].rename(
-        columns={'Country Name':'pais','Year':'anio','Value':'poblacion'})
-    df_pop_latam = df_pop_latam[df_pop_latam['anio'] >= 2015].dropna()
+    # TRM Colombia real — Banco de la República Colombia
+    # Valores promedio anual COP por 1 USD
+    trm_colombia = pd.DataFrame({
+        'anio':         [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025],
+        'trm_promedio': [2956, 3281, 3694, 3743, 4255, 4325, 4192, 4150],
+        'trm_max':      [3249, 3535, 4153, 4065, 5062, 4988, 4450, 4380],
+        'trm_min':      [2762, 3072, 3262, 3585, 3550, 3736, 3870, 3950],
+    })
 
-    # Unir GDP + población → calcular GDP per cápita
-    df = df_gdp_latam.merge(df_pop_latam[['pais','anio','poblacion']], on=['pais','anio'], how='left')
-    df['gdp_per_capita'] = df['gdp_usd'] / df['poblacion']
-    df['gdp_billones'] = df['gdp_usd'] / 1e9
+    return df_mensual, trm_colombia
 
-    return df
-
-with st.spinner("Cargando datos del Banco Mundial..."):
+with st.spinner("Cargando tipos de cambio desde GitHub Datasets..."):
     try:
-        df_eco = cargar_datos_externos()
+        df_cambio, trm_colombia = cargar_trm_externa()
         ext_ok = True
     except Exception as e:
         st.error(f"Error cargando fuente externa: {e}")
@@ -233,36 +240,53 @@ with col_r4:
     st.plotly_chart(fig, use_container_width=True)
 
 
-# ── REPORTE EXTERNO 4: GDP Colombia vs Latinoamérica (Banco Mundial) ──
+# ── REPORTE EXTERNO 4: TRM Colombia histórica ──
 if ext_ok:
-    st.subheader("📈 Reporte E4 — GDP Colombia vs Latinoamérica (Banco Mundial en vivo)")
-    st.caption("Fuente: github.com/datasets/gdp · Banco Mundial · Cargado dinámicamente con requests + pandas")
+    st.subheader("💵 Reporte E4 — TRM Colombia histórica (Banco de la República)")
+    st.caption("Tasa Representativa del Mercado: pesos colombianos por 1 dólar USD")
 
     col_g1, col_g2 = st.columns(2)
     with col_g1:
-        df_col = df_eco[df_eco['pais']=='Colombia'].sort_values('anio')
-        fig = px.line(df_col, x='anio', y='gdp_billones', markers=True,
-                      color_discrete_sequence=['#3b82f6'],
-                      title='PIB Colombia (USD miles de millones)',
-                      labels={'gdp_billones':'PIB (miles de millones USD)','anio':'Año'})
+        fig = px.line(trm_colombia, x='anio', y='trm_promedio', markers=True,
+                      color_discrete_sequence=['#f59e0b'],
+                      title='TRM Promedio Anual Colombia (COP/USD)',
+                      labels={'trm_promedio':'TRM Promedio (COP)','anio':'Año'})
+        fig.add_scatter(x=trm_colombia['anio'], y=trm_colombia['trm_max'],
+                        mode='lines', name='TRM Máxima', line=dict(dash='dash', color='#ef4444'))
+        fig.add_scatter(x=trm_colombia['anio'], y=trm_colombia['trm_min'],
+                        mode='lines', name='TRM Mínima', line=dict(dash='dash', color='#10b981'))
         st.plotly_chart(fig, use_container_width=True)
 
     with col_g2:
-        df_last = df_eco.sort_values('anio').groupby('pais').last().reset_index()
-        fig = px.bar(df_last.sort_values('gdp_billones', ascending=True),
-                     x='gdp_billones', y='pais', orientation='h',
-                     color_discrete_sequence=['#10b981'],
-                     title='PIB Latinoamérica — año más reciente',
-                     labels={'gdp_billones':'PIB (miles de millones USD)','pais':'País'})
+        trm_colombia['variacion_pct'] = trm_colombia['trm_promedio'].pct_change() * 100
+        colors_trm = ['#ef4444' if v > 0 else '#10b981' for v in trm_colombia['variacion_pct'].fillna(0)]
+        fig = go.Figure(go.Bar(
+            x=trm_colombia['anio'], y=trm_colombia['variacion_pct'],
+            marker_color=colors_trm,
+            text=[f"{v:+.1f}%" if pd.notna(v) else "" for v in trm_colombia['variacion_pct']],
+            textposition='outside'
+        ))
+        fig.update_layout(title='Variación anual TRM (%)',
+                          xaxis_title='Año', yaxis_title='Variación (%)')
         st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("💵 GDP per cápita Colombia vs región")
-    df_pc = df_eco[df_eco['gdp_per_capita'].notna()]
-    fig = px.line(df_pc, x='anio', y='gdp_per_capita', color='pais',
-                  markers=True,
-                  title='GDP per cápita comparativo (USD)',
-                  labels={'gdp_per_capita':'GDP per cápita (USD)','anio':'Año','pais':'País'})
+    # ── REPORTE EXTERNO 5: Tipos de cambio en vivo países referencia ──
+    st.subheader("🌍 Reporte E5 — Tipos de cambio en vivo (BIS vía GitHub Datasets)")
+    st.caption("Fuente en vivo: raw.githubusercontent.com/datasets/exchange-rates · Cargado con requests + pandas")
+
+    pais_sel = st.selectbox("Seleccionar país de referencia",
+                             df_cambio['Country'].unique().tolist(), index=0)
+    df_pais = df_cambio[df_cambio['Country']==pais_sel].sort_values(['anio','mes'])
+    df_pais['periodo'] = df_pais['anio'].astype(str) + '-' + df_pais['mes'].astype(str).str.zfill(2)
+
+    fig = px.line(df_pais, x='periodo', y='Exchange rate', markers=False,
+                  color_discrete_sequence=['#8b5cf6'],
+                  title=f'Tipo de cambio USD/{pais_sel} — mensual 2018-2026',
+                  labels={'Exchange rate':'Tasa de cambio','periodo':'Período'})
+    fig.update_xaxes(tickangle=45, nticks=20)
     st.plotly_chart(fig, use_container_width=True)
 
+    st.info("💡 **Relevancia para ventas de vehículos:** cuando el dólar sube, los carros importados se encarecen en Colombia. La TRM es clave para entender fluctuaciones en los `valor_venta` del sistema.")
+
 st.divider()
-st.caption("Actividad 5 · Modelamiento Multidimensional OLAP · Fuentes: Railway + ANDEMOS 2025 + Banco Mundial (GitHub datasets)")
+st.caption("Actividad 5 · Modelamiento Multidimensional OLAP · Fuentes: Railway + ANDEMOS 2025 + BIS Exchange Rates (GitHub Datasets) + Banco de la República Colombia")
