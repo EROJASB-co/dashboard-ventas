@@ -214,14 +214,18 @@ def build_cubo_olap():
         FROM ventas v
     """)
 
+    # Convertir mes a numérico (viene como varchar en la DB)
+    fact['mes'] = pd.to_numeric(fact['mes'], errors='coerce').fillna(0).astype(int)
+    fact['anio'] = pd.to_numeric(fact['anio'], errors='coerce').fillna(0).astype(int)
+
     # Dim Tiempo
     dim_tiempo = fact[['anio','mes']].drop_duplicates().copy()
-    dim_tiempo['trimestre'] = ((dim_tiempo['mes'] - 1) // 3 + 1)
+    dim_tiempo['trimestre'] = ((dim_tiempo['mes'] - 1) // 3 + 1).clip(lower=1)
     dim_tiempo['semestre']  = dim_tiempo['mes'].apply(lambda m: 1 if m <= 6 else 2)
     dim_tiempo['nombre_mes'] = dim_tiempo['mes'].map({
         1:'Enero',2:'Febrero',3:'Marzo',4:'Abril',5:'Mayo',6:'Junio',
         7:'Julio',8:'Agosto',9:'Septiembre',10:'Octubre',11:'Noviembre',12:'Diciembre'
-    })
+    }).fillna('Desconocido')
     dim_tiempo['id_tiempo'] = dim_tiempo['anio'].astype(str) + dim_tiempo['mes'].astype(str).str.zfill(2)
 
     # Dim Vehiculo
