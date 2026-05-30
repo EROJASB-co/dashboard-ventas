@@ -195,24 +195,6 @@ with col_r4:
                              'variacion_vs_2023_pct':'Crecimiento YoY (%)'})
     st.plotly_chart(fig, use_container_width=True)
 
-# ── REPORTE CRUZADO: Empresa vs Mercado por marca ──
-st.subheader("🔗 Reporte C1 — Posición empresa vs mercado nacional por marca")
-df_emp_marca = query("""SELECT v.marca, COUNT(*) as ventas_empresa
-                        FROM ventas ve JOIN vehiculos v ON ve.cod_vehiculos = v.cod_vehiculo
-                        GROUP BY v.marca""")
-df_emp_marca['pct_empresa'] = df_emp_marca['ventas_empresa'] / df_emp_marca['ventas_empresa'].sum() * 100
-df_cruce = df_emp_marca.merge(marcas_colombia[['marca','participacion_pct']], on='marca', how='inner')
-
-if not df_cruce.empty:
-    fig = go.Figure()
-    fig.add_trace(go.Bar(name='Empresa (%)', x=df_cruce['marca'], y=df_cruce['pct_empresa'],
-                         marker_color='#f97316'))
-    fig.add_trace(go.Bar(name='Mercado Colombia (%)', x=df_cruce['marca'], y=df_cruce['participacion_pct'],
-                         marker_color='#3b82f6'))
-    fig.update_layout(barmode='group', title='Participación empresa vs mercado colombiano por marca')
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.info("No hay marcas en común entre la empresa y el dataset externo.")
 
 st.divider()
 st.caption("Actividad 5 · Modelamiento Multidimensional OLAP · Fuentes: Railway + ANDEMOS/RUNT Colombia 2024")
